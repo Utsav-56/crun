@@ -37,7 +37,7 @@ func (l *Ulog) println(format string, args ...interface{}) {
 }
 
 func (l *Ulog) clear() {
-	if l.count > 0 {
+	if l.count > 0 && !flags.verbose {
 		clearLastLines(l.count)
 		l.count = 0
 	}
@@ -54,6 +54,10 @@ func getModTime(path string) (time.Time, error) {
 }
 
 func shouldRecompile() bool {
+	if flags.noCache {
+		return true
+	}
+
 	sourceTime, err1 := getModTime(filename)
 	exeTime, err2 := getModTime(exePath)
 
@@ -68,33 +72,54 @@ func shouldRecompile() bool {
 	return false
 }
 
-func init() {
+func selectCompiler() {
+	if flags.compiler != "" {
+		// Check if manually specified compiler exists
+		if CommandExists(flags.compiler) {
+			foundCompailer = flags.compiler
+			return
+		} else {
+			ulog.println("Specified compiler '%s' not found", flags.compiler)
+			os.Exit(1)
+		}
+	}
 
+	// Auto-detect compiler if not manually specified
+	if foundCompailer == "" {
+		for _, compailer := range SUPPORTED_COMPAILERS {
+			if CommandExists(compailer) {
+				foundCompailer = compailer
+				break
+			}
+		}
+	}
+}
+
+func init() {
+	var err error
+	cwd, err = os.Getwd()
+	if err != nil {
+		fmt.Println("Failed to get the Current working directory")
+		os.Exit(1)
+	}
+
+	crunFolderPath = cwd + string(os.PathSeparator) + ".crun"
+	err = os.MkdirAll(crunFolderPath, 0755)
+	if err != nil {
+		fmt.Println("Failed to make the directory")
+		os.Exit(1)
+	}
+
+	// Auto-detect compiler at startup
 	for _, compailer := range SUPPORTED_COMPAILERS {
 		if CommandExists(compailer) {
 			foundCompailer = compailer
 			break
 		}
 	}
-
-	var err error
-	cwd, err = os.Getwd()
-	if err != nil {
-		ulog.println("Failed to get the Current working directory using global directory")
-		return
-	}
-
-	crunFolderPath = cwd + string(os.PathSeparator) + ".crun"
-	err = os.MkdirAll(crunFolderPath, 0755)
-	if err != nil {
-		ulog.println("Failed to make the directory")
-		return
-	}
-
 }
 
 func runCommand(command string, args []string) bool {
-
 	cmd := exec.Command(command, args...)
 
 	cmd.Stdin = os.Stdin
@@ -122,8 +147,18 @@ func compileSourceFile(sourceFilePath string) bool {
 		args = []string{"-o", exePath, sourceFilePath}
 	}
 
-	return runCommand(foundCompailer, args)
+	// Add extra flags if provided
+	if flags.extraFlags != "" {
+		extraArgs := strings.Fields(flags.extraFlags)
+		// Insert extra flags before the source file
+		if foundCompailer == "cl" {
+			args = append(args[:1], append(extraArgs, args[1:]...)...)
+		} else {
+			args = append(args[:len(args)-1], append(extraArgs, args[len(args)-1])...)
+		}
+	}
 
+	return runCommand(foundCompailer, args)
 }
 
 func setupExePath(filename string) {
@@ -133,8 +168,30 @@ func setupExePath(filename string) {
 		return
 	}
 
-	exeName := strings.TrimSuffix(filepath.Base(absFilename), filepath.Ext(absFilename)) + ".exe"
-	exePath = filepath.Join(crunFolderPath, exeName)
+	var exeName string
+	if flags.outputName != "" {
+		exeName = flags.outputName
+		if !strings.HasSuffix(exeName, ".exe") {
+			exeName += ".exe"
+		}
+	} else {
+		exeName = strings.TrimSuffix(filepath.Base(absFilename), filepath.Ext(absFilename)) + ".exe"
+	}
+
+	var outputDir string
+	if flags.outputDir != "" {
+		outputDir = flags.outputDir
+		// Create output directory if it doesn't exist
+		err := os.MkdirAll(outputDir, 0755)
+		if err != nil {
+			ulog.println("Failed to create output directory: %s", err)
+			return
+		}
+	} else {
+		outputDir = crunFolderPath
+	}
+
+	exePath = filepath.Join(outputDir, exeName)
 
 	if !filepath.IsAbs(exePath) {
 		exePath, err = filepath.Abs(exePath)
@@ -172,9 +229,11 @@ func findSuitableSourceFile() string {
 }
 
 func main() {
+	parseFlags()
 
 	if len(os.Args) < 2 {
-		ulog.println("Usage: crun <filename>")
+		ulog.println("Usage: crun [flags] <filename>")
+		ulog.println("Use -h or --help for help")
 		os.Exit(1)
 	}
 
@@ -183,7 +242,7 @@ func main() {
 
 	ulog.println("Provided source file: %s", filename)
 
-	// THe script can take name with or without extension
+	// The script can take name with or without extension
 	// so we need to check if filename is given with extension or not
 	if filepath.Ext(filename) == "" {
 		// No extension provided, try common ones
@@ -192,30 +251,35 @@ func main() {
 
 	if !shouldRecompile() {
 		ulog.println("No changes detected, skipping recompilation.")
-
 		runBinary()
 		return
 	}
 
+	selectCompiler()
+
 	if foundCompailer == "" {
-		ulog.println("Sorry no supported compailer found in your system")
+		ulog.println("Sorry no supported compiler found in your system")
 		return
 	}
 
-	ulog.println("Using compailer: %s", foundCompailer)
+	ulog.println("Using compiler: %s", foundCompailer)
 
 	if compileSourceFile(filename) {
 		ulog.println("Compiled successfully to: %s", exePath)
 	}
 
 	runBinary()
-
 }
 
-func runBinary(args ...string) {
+func runBinary() {
 	ulog.println("Running the binary...")
 
-	// ulog.clear()
+	ulog.clear()
+
+	var args []string
+	if flags.runArgs != "" {
+		args = strings.Fields(flags.runArgs)
+	}
 
 	cmd := exec.Command(exePath, args...)
 
@@ -229,5 +293,4 @@ func runBinary(args ...string) {
 		fmt.Println("Failed to run the binary")
 		return
 	}
-
 }

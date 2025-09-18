@@ -1,0 +1,11 @@
+*.exe
+*.o
+*.obj
+*.dll
+*.so
+
+./tst/
+
+.crun/
+
+*.ps1
