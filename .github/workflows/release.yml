@@ -1,9 +1,12 @@
-name: Cross-platform Go Release
+name: Golang Multi-Platform Release
 
 on:
     push:
         tags:
             - "v*" # Trigger on version tags like v1.0.0
+
+permissions:
+    contents: write # This is the crucial line to add
 
 jobs:
     build:
@@ -35,9 +38,11 @@ jobs:
               with:
                   go-version: "1.21"
 
-            - name: Build binary
+            - name: Make Release Directory
+              run: mkdir -p Releases
+
+            - name: Build binary for ${{ matrix.GOOS }}-${{ matrix.GOARCH }}
               run: |
-                  mkdir -p Releases
                   VERSION=${GITHUB_REF#refs/tags/}
                   OUTNAME="crun_${{ matrix.GOOS }}_v${VERSION}_${{ matrix.GOARCH }}${{ matrix.EXT }}"
                   GOOS=${{ matrix.GOOS }} GOARCH=${{ matrix.GOARCH }} go build -o "Releases/$OUTNAME" .
