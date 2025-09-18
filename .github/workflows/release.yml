@@ -44,8 +44,8 @@ jobs:
             - name: Build binary for ${{ matrix.GOOS }}-${{ matrix.GOARCH }}
               run: |
                   VERSION=${GITHUB_REF#refs/tags/}
-                  OUTNAME="crun_${{ matrix.GOOS }}_v${VERSION}_${{ matrix.GOARCH }}${{ matrix.EXT }}"
-                  GOOS=${{ matrix.GOOS }} GOARCH=${{ matrix.GOARCH }} go build -o "Releases/$OUTNAME" .
+                  OUTNAME="crun_${{ matrix.GOOS }}_${VERSION}_${{ matrix.GOARCH }}${{ matrix.EXT }}"
+                  GOOS=${{ matrix.GOOS }} GOARCH=${{ matrix.GOARCH }} go build -ldflags="-s -w" -trimpath -o "Releases/$OUTNAME" .
 
             - name: Upload release asset
               uses: softprops/action-gh-release@v1

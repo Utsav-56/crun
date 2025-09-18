@@ -23,27 +23,12 @@ var crunFolderPath string
 var exePath string
 var filename string
 
-type Ulog struct {
-	count int
-}
-
-func (l *Ulog) println(format string, args ...interface{}) {
-	l.count++
-	if len(args) == 0 {
-		fmt.Println(format)
-	} else {
-		fmt.Printf(format+"\n", args...)
-	}
-}
-
-func (l *Ulog) clear() {
-	if l.count > 0 && !flags.verbose {
-		clearLastLines(l.count)
-		l.count = 0
-	}
-}
-
 var ulog = &Ulog{0}
+
+func CommandExists(command string) bool {
+	_, err := exec.LookPath(command)
+	return err == nil // Simplified: directly return the boolean result
+}
 
 func getModTime(path string) (time.Time, error) {
 	info, err := os.Stat(path)

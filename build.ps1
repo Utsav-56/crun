@@ -9,7 +9,7 @@ $env:GOOS = "windows"
 $env:GOARCH = "amd64"
 
 # Build the Go program
-go build -o "$outputDirectory\crun.exe" .
+go build -ldflags="-s -w" -trimpath -o "$outputDirectory\crun.exe" .
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Build failed with exit code $LASTEXITCODE"
     exit $LASTEXITCODE
