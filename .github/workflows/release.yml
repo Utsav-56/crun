@@ -1,0 +1,51 @@
+name: Cross-platform Go Release
+
+on:
+    push:
+        tags:
+            - "v*" # Trigger on version tags like v1.0.0
+
+jobs:
+    build:
+        name: Build for All Platforms
+        runs-on: ubuntu-latest
+
+        strategy:
+            matrix:
+                include:
+                    - GOOS: windows
+                      GOARCH: 386
+                      EXT: .exe
+                    - GOOS: windows
+                      GOARCH: amd64
+                      EXT: .exe
+                    - GOOS: linux
+                      GOARCH: amd64
+                      EXT: ""
+                    - GOOS: darwin
+                      GOARCH: arm64
+                      EXT: ""
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+
+            - name: Set up Go
+              uses: actions/setup-go@v4
+              with:
+                  go-version: "1.21"
+
+            - name: Build binary
+              run: |
+                  mkdir -p Releases
+                  VERSION=${GITHUB_REF#refs/tags/}
+                  OUTNAME="crun_${{ matrix.GOOS }}_v${VERSION}_${{ matrix.GOARCH }}${{ matrix.EXT }}"
+                  GOOS=${{ matrix.GOOS }} GOARCH=${{ matrix.GOARCH }} go build -o "Releases/$OUTNAME" ./cmd/crun
+
+            - name: Upload release asset
+              uses: softprops/action-gh-release@v1
+              with:
+                  files: Releases/*
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GITHUB_REF: ${{ github.ref }}
