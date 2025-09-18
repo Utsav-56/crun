@@ -40,7 +40,7 @@ jobs:
                   mkdir -p Releases
                   VERSION=${GITHUB_REF#refs/tags/}
                   OUTNAME="crun_${{ matrix.GOOS }}_v${VERSION}_${{ matrix.GOARCH }}${{ matrix.EXT }}"
-                  GOOS=${{ matrix.GOOS }} GOARCH=${{ matrix.GOARCH }} go build -o "Releases/$OUTNAME" ./cmd/crun
+                  GOOS=${{ matrix.GOOS }} GOARCH=${{ matrix.GOARCH }} go build -o "Releases/$OUTNAME" .
 
             - name: Upload release asset
               uses: softprops/action-gh-release@v1
