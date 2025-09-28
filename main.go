@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 )
@@ -177,18 +176,12 @@ func init() {
 	}
 	crunFolder = filepath.Join(cwd, ".crun")
 	mustMakeDir(crunFolder)
-	flags.runInNewTerminal = runtime.GOOS == "windows"
+	flags.runInNewTerminal = false
 }
 
 func main() {
 
 	parseFlags()
-
-	if flags.runInNewTerminal {
-		if runtime.GOOS != "windows" {
-			flags.runInNewTerminal = false
-		}
-	}
 
 	if len(os.Args) < 2 {
 		ulog.println("Usage: crun [flags] <filename>")

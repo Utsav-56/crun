@@ -26,7 +26,7 @@ func LaunchInExternalTerminal(binaryPath string, args ...string) error {
 	case "darwin":
 		// macOS: use AppleScript to run in Terminal.app
 		// The "read -n 1" ensures it waits for user input before closing
-		cmdStr := fmt.Sprintf("'%s %s; echo; echo Press Enter to exit...; read -n 1' ", binaryPath, argLine)
+		cmdStr := fmt.Sprintf("'%s %s; echo; echo Press Enter to exit...; read -n 1' ", quotedBinary, argLine)
 		script := fmt.Sprintf(`tell application "Terminal"
 			activate
 			do script %s
@@ -50,7 +50,7 @@ func LaunchInExternalTerminal(binaryPath string, args ...string) error {
 		}
 
 		// Command that pauses
-		shCmd := fmt.Sprintf("%s %s; echo; echo Press Enter to exit...; read -n 1", binaryPath, argLine)
+		shCmd := fmt.Sprintf("%s %s; echo; echo Press Enter to exit...; read -n 1", quotedBinary, argLine)
 
 		var cmd *exec.Cmd
 		switch term {

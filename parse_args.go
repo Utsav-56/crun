@@ -24,15 +24,15 @@ var flags Flags
 
 // Flag aliases mapping
 var flagAliases = map[string]string{
-	"--verbose":         "-v",
-	"--recompile":       "-n",
-	"--help":            "-h",
-	"--compiler":        "-c",
-	"--extra":           "-e",
-	"--output":          "-o",
-	"--directory":       "-d",
-	"--run-args":        "-r",
-	"--no-new-terminal": "-std",
+	"--verbose":      "-v",
+	"--recompile":    "-n",
+	"--help":         "-h",
+	"--compiler":     "-c",
+	"--extra":        "-e",
+	"--output":       "-o",
+	"--directory":    "-d",
+	"--run-args":     "-r",
+	"--new-terminal": "-ntw",
 }
 
 func parseFlags() {
@@ -93,9 +93,9 @@ func parseFlags() {
 				fmt.Println("Error: -r flag requires run arguments")
 				os.Exit(1)
 			}
-		case "-std":
-			flags.runInNewTerminal = false
-			ulog.println("-std flag is set so, will not open a new terminal window")
+		case "-ntw":
+			flags.runInNewTerminal = true
+			ulog.println("-ntw flag is set so, will open a new terminal window to run the binary")
 		default:
 			if strings.HasPrefix(arg, "-") {
 				fmt.Printf("Error: Unknown flag %s\n", arg)

@@ -11,6 +11,7 @@ A fast and simple command-line tool to compile and run C/C++ files with automati
 - **Extension Auto-Detection**: Automatically finds source files even without extensions
 - **Custom Output Control**: Specify output names and directories
 - **Runtime Arguments**: Pass arguments directly to compiled binaries
+- **External Terminal Support**: Option to run programs in a new terminal window (`-ntw` flag)
 
 ## Installation
 
@@ -70,11 +71,11 @@ crun -o myprogram -d ./bin main.c
 
 ### Output Control
 
-| Short | Long          | Description                   | Example                |
-| ----- | ------------- | ----------------------------- | ---------------------- |
-| `-o`  | `--output`    | Output binary name            | `crun -o myapp main.c` |
-| `-d`  | `--directory` | Directory to store the binary | `crun -d ./bin main.c` |
-| `-std` | `--no-new-terminal` | Disable new terminal for output | `crun -std main.c` |
+| Short  | Long          | Description                     | Example                |
+|--------| ------------- |---------------------------------|------------------------|
+| `-o`   | `--output`    | Output binary name              | `crun -o myapp main.c` |
+| `-d`   | `--directory` | Directory to store the binary   | `crun -d ./bin main.c` |
+| `-ntw` | `--new-terminal` | Runs in new terminal for output | `crun -ntw main.c`     |
 
 ### Runtime Control
 
@@ -349,15 +350,19 @@ case "-x":
 
 ## Changelog
 
+### Version 1.3.0
+- Fixed minor bugs and improved stability
+- Enhanced logging for better debugging
+- Improved cross-platform compatibility
+- "-std" flag is removed and "-ntw" is added
+- "-ntw" will start the program in new terminal window
+- By default the current terminal session will be used
+
 
 ### Version 1.2.0
 - Added support for running in external terminal windows (Windows only)
 - Improved error messages and logging
 - "--no-new-terminal" or "-std" flag disables new terminal for output and uses current terminal
-
-
-
-
 
 ### Version 1.0.0
 
