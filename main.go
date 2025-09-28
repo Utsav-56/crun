@@ -5,11 +5,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
 
-var SUPPORTED_COMPAILERS = []string{
+var SUPPORTED_COMPILERS = []string{
 	"clang",
 	"gcc",
 	"zig",
@@ -71,7 +72,7 @@ func selectCompiler() {
 
 	// Auto-detect compiler if not manually specified
 	if foundCompailer == "" {
-		for _, compailer := range SUPPORTED_COMPAILERS {
+		for _, compailer := range SUPPORTED_COMPILERS {
 			if CommandExists(compailer) {
 				foundCompailer = compailer
 				break
@@ -96,7 +97,7 @@ func init() {
 	}
 
 	// Auto-detect compiler at startup
-	for _, compailer := range SUPPORTED_COMPAILERS {
+	for _, compailer := range SUPPORTED_COMPILERS {
 		if CommandExists(compailer) {
 			foundCompailer = compailer
 			break
@@ -113,7 +114,7 @@ func runCommand(command string, args []string) bool {
 
 	err := cmd.Run()
 	if err != nil {
-		ulog.println("Failed to compile the source file")
+		ulog.println("Failed to compile the source file", err)
 		return false
 	}
 
@@ -216,6 +217,13 @@ func findSuitableSourceFile() string {
 func main() {
 	parseFlags()
 
+	// check if running in non windows machine in that case running in external terminal is not supported
+	if runtime.GOOS != "windows" {
+		flags.runInNewTerminal = false
+	} else {
+		flags.runInNewTerminal = true
+	}
+
 	if len(os.Args) < 2 {
 		ulog.println("Usage: crun [flags] <filename>")
 		ulog.println("Use -h or --help for help")
@@ -223,7 +231,6 @@ func main() {
 	}
 
 	filename = os.Args[1]
-	setupExePath(filename)
 
 	ulog.println("Provided source file: %s", filename)
 
@@ -233,6 +240,8 @@ func main() {
 		// No extension provided, try common ones
 		findSuitableSourceFile()
 	}
+
+	setupExePath(filename)
 
 	if !shouldRecompile() {
 		ulog.println("No changes detected, skipping recompilation.")
@@ -251,9 +260,11 @@ func main() {
 
 	if compileSourceFile(filename) {
 		ulog.println("Compiled successfully to: %s", exePath)
+		runBinary()
+	} else {
+		ulog.println("Compilation failed.")
 	}
 
-	runBinary()
 }
 
 func runBinary() {
@@ -266,16 +277,34 @@ func runBinary() {
 		args = strings.Fields(flags.runArgs)
 	}
 
-	cmd := exec.Command(exePath, args...)
+	if !pathExists(exePath) {
+		ulog.println("Executable not found: %s", exePath)
+	}
 
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	var err error
 
-	err := cmd.Run()
+	if flags.runInNewTerminal {
+		err = LaunchInExternalTerminal(exePath, args...)
+
+	} else {
+		cmd := exec.Command(exePath, args...)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err = cmd.Run()
+		if err != nil {
+			ulog.println("Failed to run the binary: %s", err)
+		}
+
+	}
 
 	if err != nil {
 		fmt.Println("Failed to run the binary")
 		return
 	}
+}
+
+func pathExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
 }

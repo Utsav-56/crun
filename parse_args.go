@@ -3,36 +3,40 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 )
 
 // Command line flags
 type Flags struct {
-	verbose    bool
-	noCache    bool
-	help       bool
-	compiler   string
-	extraFlags string
-	outputName string
-	outputDir  string
-	runArgs    string
+	verbose          bool
+	noCache          bool
+	help             bool
+	compiler         string
+	extraFlags       string
+	outputName       string
+	outputDir        string
+	runArgs          string
+	runInNewTerminal bool
 }
 
 var flags Flags
 
 // Flag aliases mapping
 var flagAliases = map[string]string{
-	"--verbose":   "-v",
-	"--recompile": "-n",
-	"--help":      "-h",
-	"--compiler":  "-c",
-	"--extra":     "-e",
-	"--output":    "-o",
-	"--directory": "-d",
-	"--run-args":  "-r",
+	"--verbose":         "-v",
+	"--recompile":       "-n",
+	"--help":            "-h",
+	"--compiler":        "-c",
+	"--extra":           "-e",
+	"--output":          "-o",
+	"--directory":       "-d",
+	"--run-args":        "-r",
+	"--no-new-terminal": "-std",
 }
 
 func parseFlags() {
+
 	// Process aliases first
 	args := processAliases(os.Args[1:])
 
@@ -89,6 +93,9 @@ func parseFlags() {
 				fmt.Println("Error: -r flag requires run arguments")
 				os.Exit(1)
 			}
+		case "-std":
+			flags.runInNewTerminal = false
+			ulog.println("-std flag is set so, will not open a new terminal window")
 		default:
 			if strings.HasPrefix(arg, "-") {
 				fmt.Printf("Error: Unknown flag %s\n", arg)
@@ -137,7 +144,11 @@ func showHelp() {
 	fmt.Println("  -o, --output        Output binary name")
 	fmt.Println("  -d, --directory     Directory to store the binary")
 	fmt.Println("  -r, --run-args      Arguments to pass to the binary")
-	fmt.Println("\nSupported compilers:", strings.Join(SUPPORTED_COMPAILERS, ", "))
+
+	if runtime.GOOS == "windows" {
+		fmt.Println("  -std, --no-new-terminal  Do not open a new terminal window to run the binary (on by default) supported only on Windows")
+	}
+	fmt.Println("\nSupported compilers:", strings.Join(SUPPORTED_COMPILERS, ", "))
 	fmt.Println("\nExamples:")
 	fmt.Println("  crun main.c")
 	fmt.Println("  crun -v main.cpp")
@@ -146,4 +157,8 @@ func showHelp() {
 	fmt.Println("  crun --compiler clang --extra \"-g -fsanitize=address\" main.c")
 	fmt.Println("  crun -o myprogram -d ./bin main.c")
 	fmt.Println("  crun -r \"arg1 arg2\" main.c")
+
+	if runtime.GOOS == "windows" {
+		fmt.Println("  crun -std main.c")
+	}
 }

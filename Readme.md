@@ -14,7 +14,12 @@ A fast and simple command-line tool to compile and run C/C++ files with automati
 
 ## Installation
 
-1. Clone or download the repository
+1. Clone or download the repository 
+   ```bash
+   git clone https://github.com/Utsav-56/crun
+   ```
+   
+
 2. Build the tool:
     ```bash
     go build -o crun .
@@ -26,6 +31,9 @@ A fast and simple command-line tool to compile and run C/C++ files with automati
 ```bash
 # Simple compile and run
 crun main.c
+
+# Compile with no new terminal window
+crun -std main.c
 
 # Compile with specific compiler
 crun -c gcc main.cpp
@@ -40,7 +48,7 @@ crun -o myprogram -d ./bin main.c
 ## Command Syntax
 
 ```bash
-crun [flags] <filename>
+  crun [flags] <filename>
 ```
 
 ## Flags Reference
@@ -66,6 +74,7 @@ crun [flags] <filename>
 | ----- | ------------- | ----------------------------- | ---------------------- |
 | `-o`  | `--output`    | Output binary name            | `crun -o myapp main.c` |
 | `-d`  | `--directory` | Directory to store the binary | `crun -d ./bin main.c` |
+| `-std` | `--no-new-terminal` | Disable new terminal for output | `crun -std main.c` |
 
 ### Runtime Control
 
@@ -95,6 +104,9 @@ crun -c zig main.c
 ## File Extension Handling
 
 CRUN automatically detects source files even without extensions:
+
+**Note:** _If multiple files with the same name but different extensions exist, the priority is given based on the order in the Supported Extensions list._
+
 
 ```bash
 # These are equivalent if main.c exists
@@ -216,7 +228,7 @@ your-project/
 
     ```bash
     # Install a supported compiler
-    # Windows: Install Visual Studio or mingw
+    # Windows: Install Visual Studio or mingw or run winget install LLVM.LLVM
     # Linux: sudo apt install gcc
     # macOS: xcode-select --install
     ```
@@ -336,6 +348,16 @@ case "-x":
 [Add your license information here]
 
 ## Changelog
+
+
+### Version 1.1.0
+- Added support for running in external terminal windows (Windows only)
+- Improved error messages and logging
+- "--no-new-terminal" or "-std" flag disables new terminal for output and uses current terminal
+
+
+
+
 
 ### Version 1.0.0
 
