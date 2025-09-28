@@ -350,7 +350,7 @@ case "-x":
 ## Changelog
 
 
-### Version 1.1.0
+### Version 1.2.0
 - Added support for running in external terminal windows (Windows only)
 - Improved error messages and logging
 - "--no-new-terminal" or "-std" flag disables new terminal for output and uses current terminal
