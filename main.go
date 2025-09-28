@@ -10,235 +10,195 @@ import (
 	"time"
 )
 
-var SUPPORTED_COMPILERS = []string{
-	"clang",
-	"gcc",
-	"zig",
-	"cl",
-	"bytes",
+var (
+	supportedCompilers                 = []string{"clang", "gcc", "zig", "cl", "bytes"}
+	foundCompiler                      string
+	cwd, crunFolder, exePath, filename string
+	ulog                               = &Ulog{0}
+)
+
+// ---------- Helpers ----------
+
+func commandExists(cmd string) bool {
+	_, err := exec.LookPath(cmd)
+	return err == nil
 }
 
-var foundCompailer string
-var cwd string
-var crunFolderPath string
-var exePath string
-var filename string
-
-var ulog = &Ulog{0}
-
-func CommandExists(command string) bool {
-	_, err := exec.LookPath(command)
-	return err == nil // Simplified: directly return the boolean result
+func pathExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
 }
 
-func getModTime(path string) (time.Time, error) {
+func getModTime(path string) time.Time {
 	info, err := os.Stat(path)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}
 	}
-	return info.ModTime(), nil
+	return info.ModTime()
 }
+
+func mustMakeDir(path string) {
+	if err := os.MkdirAll(path, 0755); err != nil {
+		ulog.println("Failed to create directory %s: %v", path, err)
+		os.Exit(1)
+	}
+}
+
+// ---------- Core logic ----------
 
 func shouldRecompile() bool {
 	if flags.noCache {
 		return true
 	}
-
-	sourceTime, err1 := getModTime(filename)
-	exeTime, err2 := getModTime(exePath)
-
-	if err1 != nil {
-		return true
-	}
-
-	// If binary doesn't exist or source is newer, recompile
-	if err2 != nil || sourceTime.After(exeTime) {
-		return true
-	}
-	return false
+	srcTime, exeTime := getModTime(filename), getModTime(exePath)
+	return srcTime.IsZero() || exeTime.IsZero() || srcTime.After(exeTime)
 }
 
-func selectCompiler() {
-	if flags.compiler != "" {
-		// Check if manually specified compiler exists
-		if CommandExists(flags.compiler) {
-			foundCompailer = flags.compiler
-			return
+func detectCompiler(preferred string) string {
+	if preferred != "" {
+		if commandExists(preferred) {
+			return preferred
+		}
+		ulog.println("Specified compiler '%s' not found", preferred)
+		os.Exit(1)
+	}
+
+	for _, c := range supportedCompilers {
+		if commandExists(c) {
+			return c
+		}
+	}
+	return ""
+}
+
+func runCommand(cmd string, args ...string) error {
+	c := exec.Command(cmd, args...)
+	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
+	return c.Run()
+}
+
+func compile(source string) bool {
+	var args []string
+	switch foundCompiler {
+	case "zig":
+		args = []string{"cc", "-o", exePath, source}
+	case "cl":
+		args = []string{"/Fe:" + exePath, source}
+	default:
+		args = []string{"-o", exePath, source}
+	}
+
+	if flags.extraFlags != "" {
+		extra := strings.Fields(flags.extraFlags)
+		if foundCompiler == "cl" {
+			args = append(args[:1], append(extra, args[1:]...)...)
 		} else {
-			ulog.println("Specified compiler '%s' not found", flags.compiler)
-			os.Exit(1)
+			args = append(args[:len(args)-1], append(extra, args[len(args)-1])...)
 		}
 	}
 
-	// Auto-detect compiler if not manually specified
-	if foundCompailer == "" {
-		for _, compailer := range SUPPORTED_COMPILERS {
-			if CommandExists(compailer) {
-				foundCompailer = compailer
-				break
-			}
-		}
-	}
-}
-
-func init() {
-	var err error
-	cwd, err = os.Getwd()
-	if err != nil {
-		fmt.Println("Failed to get the Current working directory")
-		os.Exit(1)
-	}
-
-	crunFolderPath = cwd + string(os.PathSeparator) + ".crun"
-	err = os.MkdirAll(crunFolderPath, 0755)
-	if err != nil {
-		fmt.Println("Failed to make the directory")
-		os.Exit(1)
-	}
-
-	// Auto-detect compiler at startup
-	for _, compailer := range SUPPORTED_COMPILERS {
-		if CommandExists(compailer) {
-			foundCompailer = compailer
-			break
-		}
-	}
-}
-
-func runCommand(command string, args []string) bool {
-	cmd := exec.Command(command, args...)
-
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	err := cmd.Run()
-	if err != nil {
-		ulog.println("Failed to compile the source file", err)
+	if err := runCommand(foundCompiler, args...); err != nil {
+		ulog.println("Compilation failed: %v", err)
 		return false
 	}
-
 	return true
 }
 
-func compileSourceFile(sourceFilePath string) bool {
-	var args []string
+func setupExePath(src string) {
+	absSrc, _ := filepath.Abs(src)
 
-	switch foundCompailer {
-	case "zig":
-		args = []string{"cc", "-o", exePath, sourceFilePath}
-	case "cl":
-		args = []string{"/Fe:" + exePath, sourceFilePath}
-	default:
-		args = []string{"-o", exePath, sourceFilePath}
+	name := flags.outputName
+	if name == "" {
+		name = strings.TrimSuffix(filepath.Base(absSrc), filepath.Ext(absSrc))
+	}
+	if !strings.HasSuffix(name, ".exe") {
+		name += ".exe"
 	}
 
-	// Add extra flags if provided
-	if flags.extraFlags != "" {
-		extraArgs := strings.Fields(flags.extraFlags)
-		// Insert extra flags before the source file
-		if foundCompailer == "cl" {
-			args = append(args[:1], append(extraArgs, args[1:]...)...)
-		} else {
-			args = append(args[:len(args)-1], append(extraArgs, args[len(args)-1])...)
-		}
+	outputDir := flags.outputDir
+	if outputDir == "" {
+		outputDir = crunFolder
 	}
+	mustMakeDir(outputDir)
 
-	return runCommand(foundCompailer, args)
+	exePath, _ = filepath.Abs(filepath.Join(outputDir, name))
 }
 
-func setupExePath(filename string) {
-	absFilename, err := filepath.Abs(filename)
-	if err != nil {
-		ulog.println("Error resolving absolute path: %s", err)
+func findSource() string {
+	if filepath.Ext(filename) != "" {
+		return filename
+	}
+
+	ulog.println("No extension provided, trying common ones...")
+	for _, ext := range []string{".c", ".cpp", ".cc", ".cxx", ".h", ".hpp", ".hh", ".hxx"} {
+		if pathExists(filename + ext) {
+			ulog.println("Found: %s", filename+ext)
+			return filename + ext
+		}
+	}
+	ulog.println("No matching source file found")
+	return ""
+}
+
+// ---------- Runner ----------
+
+func runBinary() {
+	ulog.println("Running binary...")
+
+	args := []string{}
+	if flags.runArgs != "" {
+		args = strings.Fields(flags.runArgs)
+	}
+
+	if !pathExists(exePath) {
+		ulog.println("Executable not found: %s", exePath)
 		return
 	}
 
-	var exeName string
-	if flags.outputName != "" {
-		exeName = flags.outputName
-		if !strings.HasSuffix(exeName, ".exe") {
-			exeName += ".exe"
-		}
+	var err error
+	if flags.runInNewTerminal {
+		err = LaunchInExternalTerminal(exePath, args...)
 	} else {
-		exeName = strings.TrimSuffix(filepath.Base(absFilename), filepath.Ext(absFilename)) + ".exe"
+		ulog.clear()
+		err = runCommand(exePath, args...)
 	}
-
-	var outputDir string
-	if flags.outputDir != "" {
-		outputDir = flags.outputDir
-		// Create output directory if it doesn't exist
-		err := os.MkdirAll(outputDir, 0755)
-		if err != nil {
-			ulog.println("Failed to create output directory: %s", err)
-			return
-		}
-	} else {
-		outputDir = crunFolderPath
-	}
-
-	exePath = filepath.Join(outputDir, exeName)
-
-	if !filepath.IsAbs(exePath) {
-		exePath, err = filepath.Abs(exePath)
-		if err != nil {
-			ulog.println("Error resolving exePath: %s", err)
-		}
+	if err != nil {
+		ulog.println("Failed to run binary: %v", err)
 	}
 }
 
-func clearLastLines(n int) {
-	for i := 0; i < n; i++ {
-		fmt.Print("\033[1A") // Move cursor up one line
-		fmt.Print("\033[2K") // Clear entire line
-	}
-}
+// ---------- Init & Main ----------
 
-func findSuitableSourceFile() string {
-	ulog.println("No file extension provided, trying common extensions...")
-	possibleExtensions := []string{".c", ".cpp", ".cc", ".cxx", ".h", ".hpp", ".hh", ".hxx"}
-	found := false
-	for _, ext := range possibleExtensions {
-		if _, err := os.Stat(filename + ext); err == nil {
-			filename += ext
-			found = true
-			break
-		}
+func init() {
+	var err error
+	if cwd, err = os.Getwd(); err != nil {
+		fmt.Println("Failed to get working dir:", err)
+		os.Exit(1)
 	}
-	if !found {
-		ulog.println("No file found with common extensions")
-		return ""
-	}
-	ulog.println("Found file: %s", filename)
-	ulog.println("If this is not the intended file, please provide the correct filename with extension.")
-	return filename
+	crunFolder = filepath.Join(cwd, ".crun")
+	mustMakeDir(crunFolder)
+	flags.runInNewTerminal = runtime.GOOS == "windows"
 }
 
 func main() {
+
 	parseFlags()
 
-	// check if running in non windows machine in that case running in external terminal is not supported
-	if runtime.GOOS != "windows" {
-		flags.runInNewTerminal = false
-	} else {
-		flags.runInNewTerminal = true
+	if flags.runInNewTerminal {
+		if runtime.GOOS != "windows" {
+			flags.runInNewTerminal = false
+		}
 	}
 
 	if len(os.Args) < 2 {
 		ulog.println("Usage: crun [flags] <filename>")
-		ulog.println("Use -h or --help for help")
 		os.Exit(1)
 	}
 
 	filename = os.Args[1]
-
-	ulog.println("Provided source file: %s", filename)
-
-	// The script can take name with or without extension
-	// so we need to check if filename is given with extension or not
-	if filepath.Ext(filename) == "" {
-		// No extension provided, try common ones
-		findSuitableSourceFile()
+	filename = findSource()
+	if filename == "" {
+		os.Exit(1)
 	}
 
 	setupExePath(filename)
@@ -249,62 +209,16 @@ func main() {
 		return
 	}
 
-	selectCompiler()
-
-	if foundCompailer == "" {
-		ulog.println("Sorry no supported compiler found in your system")
+	foundCompiler = detectCompiler(flags.compiler)
+	if foundCompiler == "" {
+		ulog.println("No supported compiler found")
 		return
 	}
 
-	ulog.println("Using compiler: %s", foundCompailer)
+	ulog.println("Using compiler: %s", foundCompiler)
 
-	if compileSourceFile(filename) {
-		ulog.println("Compiled successfully to: %s", exePath)
+	if compile(filename) {
+		ulog.println("Compiled successfully: %s", exePath)
 		runBinary()
-	} else {
-		ulog.println("Compilation failed.")
 	}
-
-}
-
-func runBinary() {
-	ulog.println("Running the binary...")
-
-	ulog.clear()
-
-	var args []string
-	if flags.runArgs != "" {
-		args = strings.Fields(flags.runArgs)
-	}
-
-	if !pathExists(exePath) {
-		ulog.println("Executable not found: %s", exePath)
-	}
-
-	var err error
-
-	if flags.runInNewTerminal {
-		err = LaunchInExternalTerminal(exePath, args...)
-
-	} else {
-		cmd := exec.Command(exePath, args...)
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		err = cmd.Run()
-		if err != nil {
-			ulog.println("Failed to run the binary: %s", err)
-		}
-
-	}
-
-	if err != nil {
-		fmt.Println("Failed to run the binary")
-		return
-	}
-}
-
-func pathExists(path string) bool {
-	_, err := os.Stat(path)
-	return !os.IsNotExist(err)
 }

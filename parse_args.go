@@ -148,7 +148,7 @@ func showHelp() {
 	if runtime.GOOS == "windows" {
 		fmt.Println("  -std, --no-new-terminal  Do not open a new terminal window to run the binary (on by default) supported only on Windows")
 	}
-	fmt.Println("\nSupported compilers:", strings.Join(SUPPORTED_COMPILERS, ", "))
+	fmt.Println("\nSupported compilers:", strings.Join(supportedCompilers, ", "))
 	fmt.Println("\nExamples:")
 	fmt.Println("  crun main.c")
 	fmt.Println("  crun -v main.cpp")

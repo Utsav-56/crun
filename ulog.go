@@ -21,3 +21,12 @@ func (l *Ulog) clear() {
 		l.count = 0
 	}
 }
+
+func clearLastLines(n int) {
+	for i := 0; i < n; i++ {
+		// Move cursor up one line
+		fmt.Print("\033[A")
+		// Clear the line
+		fmt.Print("\033[2K")
+	}
+}
